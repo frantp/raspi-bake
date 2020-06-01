@@ -1,0 +1,31 @@
+#!/bin/sh
+
+die() { [ "$#" -eq 0 ] || echo "$*" >&2; exit 1; }
+
+IF="${1?"Interface not provided"}"
+
+BLACKLIST="/etc/modprobe.d/raspi-blacklist.conf"
+CONFIG="/boot/config.txt"
+CMDLINE="/boot/cmdline.txt"
+
+. "$(dirname "$0")/util/set_config_var"
+
+if [ "${IF}" = "i2c" ]; then
+	# raspi-config nonint do_i2c 0
+	set_config_var dtparam=i2c_arm on "${CONFIG}"
+	if [ ! -e "${BLACKLIST}" ]; then
+		touch "${BLACKLIST}"
+	fi
+	sed -i -E 's/^\(blacklist[[:space:]]*i2c[-_]bcm2708\)/#\\1/' "${BLACKLIST}"
+	sed -i -E 's/^#[[:space:]]*\(i2c[-_]dev\)/\\1/' "/etc/modules"
+	if ! grep -q "^i2c[-_]dev" "/etc/modules"; then
+		echo "i2c-dev" >> "/etc/modules"
+	fi
+elif [ "${IF}" = "serial" ]; then
+	# raspi-config nonint do_serial 2
+    sed -i 's/console=ttyAMA0,[0-9]\+ //' "${CMDLINE}"
+    sed -i 's/console=serial0,[0-9]\+ //' "${CMDLINE}"
+	set_config_var enable_uart 1 "${CONFIG}"
+else
+	die "Unssuported interface"
+fi

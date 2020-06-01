@@ -1,0 +1,6 @@
+#!/bin/sh
+
+LOCALE="${1?"Locale not provided"}"
+
+echo "Changing locale to '${LOCALE}'"
+raspi-config nonint do_change_locale "${LOCALE}"

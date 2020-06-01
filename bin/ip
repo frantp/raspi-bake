@@ -1,0 +1,17 @@
+#!/bin/sh
+
+IP="${1?"Static IP not provided"}"
+
+echo "Setting static IP address '${IP}'"
+FILE="/etc/dhcpcd.conf"
+
+# Remove if existing
+sed -i '/interface wlan0/,/^$/d' "${FILE}"
+
+# Add
+cat << EOM >> "${FILE}"
+interface wlan0
+static ip_address=${IP}/24
+static routers=${IP%.*}.1
+static domain_name_servers=${IP%.*}.1 8.8.8.8
+EOM

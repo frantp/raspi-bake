@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# raspi-config nonint do_ssh 0
+ssh-keygen -qA && update-rc.d ssh enable

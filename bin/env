@@ -1,0 +1,9 @@
+#!/bin/sh
+
+KEY="${1?"Environment variable name not provided"}"
+VAL="${2?"Environment variable value not provided"}"
+
+echo "Setting environment variable '${KEY}'"
+FILE="/etc/environment"
+. "$(dirname "$0")/util/set_config_var"
+set_config_var "${KEY}" "${VAL}" "${FILE}"

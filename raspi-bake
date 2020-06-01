@@ -1,0 +1,175 @@
+#!/bin/bash
+
+die() { [ "$#" -eq 0 ] || echo "$*" >&2; exit 1; }
+
+show() { [ -n "${quiet}" ] || echo "$@" >&2; }
+
+usage() {
+	program="$(basename "$0")"
+	cat <<- EOM
+		Usage:
+		  ${program} [-w] [-r <total_size>] [-s]
+		             [-d <mount_dir>] <path>     [nspawn_args]
+		  ${program} [-d <boot_dir>]  <root_dir> [nspawn_args]
+		  ${program} -h
+
+		Arguments:"
+		  path:            Image file or device to mount and edit
+		  mount_dir:       Directory to create the mount points for the partitions
+		                   inside the image file [default: /mnt/<img_filename>]
+		  root_dir:        Directory of the root partition to edit, when already mounted
+		  boot_dir:        Directory of the boot partition to edit, when already mounted
+		                   [default: <root_dir>/boot]
+		  nspawn_args:     List of arguments passed to the underlying systemd-nspawn.
+		                   A common example is to execute a script directly:
+		                   \$ ${program} rpi.img ./my-script.sh with arguments
+		                   or via redirection:
+		                   \$ ${program} rpi.img -P < ./my-script.sh
+		Options:
+		  -h               Show this help message
+		  -q               Quiet mode, do not print progress messages
+		  -w               Wait after each step in the process to allow manual editing
+		  -r <total_size>  Resize (sparse) image file to <total_size>; <total_size> is
+		                   directly passed to the 'seek' argument of dd
+	EOM
+}
+
+RASPBIAN_URL="https://downloads.raspberrypi.org/raspios_lite_armhf_latest"
+HOST_MOUNT_DIR="/mnt/host"
+
+# Check root
+if [ "$EUID" -ne 0 ]; then
+	die "Must be run as root"
+fi
+
+# Parse arguments
+while getopts "hqwr:d:" arg; do
+	case "${arg}" in
+		h) usage; exit 0 ;;
+		q) quiet=true ;;
+		w) wait=true ;;
+		r) resize="${OPTARG}" ;;
+		d) extra_dir="${OPTARG}" ;;
+	esac
+done
+shift $(( OPTIND - 1 ))
+
+path="${1?"$(usage)"}"
+shift 1
+
+# Ensure proper cleanup
+cleanup() {
+	if [ -n "${boot_mnt}" ]; then
+		umount "${boot_mnt}" 2> /dev/null
+		show "Unmounted boot partition"
+	fi
+	if [ -n "${root_mnt}" ]; then
+		umount "${root_mnt}" 2> /dev/null
+		rmdir "${root_mnt}" 2> /dev/null
+		show "Unmounted root partition"
+	fi
+	if [ -n "${device}" ]; then
+		losetup -d "${device}"
+		show "Removed loop devide"
+	fi
+}
+trap cleanup 0
+
+# Download image if necessary
+if [ ! -e "${path}" ]; then
+	if [ ! -e "${path}.zip" ]; then
+		show "Downloading image"
+		wget "${RASPBIAN_URL}" -qO "${path}.zip" || \
+			die "Failed"
+		downloaded=true
+	fi
+
+	show "Extracting image"
+	unzip -p "${path}.zip" > "${path}" || \
+		die "Failed"
+
+	if [ -n "${downloaded}" ]; then
+		rm "${path}.zip"
+	fi
+fi
+
+# Create loop device if necessary
+if [ -f "${path}" ]; then
+	if [ -n "${resize}" ]; then
+		show "Resizing (sparse) image file"
+		dd if="/dev/zero" of="${path}" \
+		   bs=1 count=0 seek="${resize}" status=none
+	fi
+
+	show "Creating loop device"
+	device="$(losetup -Pf "${path}" --show)"
+	path="${device}"
+
+	if [ -n "${wait}" ]; then
+		read -p "Waiting, press ENTER to continue"
+		exit 0
+	fi
+fi
+
+# Create mount point if necessary
+if [ -b "${path}" ]; then
+	for dev in "${path}p"*; do
+		label=$(blkid -po export "${dev}" \
+			| grep 'LABEL' \
+			| cut -d = -f 2)
+		number=$(blkid -po export "${dev}" \
+			| grep 'PART_ENTRY_NUMBER' \
+			| cut -d = -f 2)
+		if [[ ${label} == root* ]]; then
+			root_dev="${dev}"
+			root_num="${number}"
+			show " - Root device: ${root_dev}"
+		elif [[ ${label} == boot* ]]; then
+			boot_dev="${dev}"
+			boot_num="${number}"
+			show " - Boot device: ${boot_dev}"
+		fi
+	done
+	if [ -z "${root_dev}" ]; then
+		die "No root partition found"
+	fi
+
+	show "Ensuring maximum size for root partition"
+	parted -s "${path}" unit s resizepart ${root_num} 100%
+	resize2fs -f "${root_dev}" > /dev/null 2>&1
+
+	show "Mounting root partition"
+	root_mnt="${extra_dir:-"/mnt/rootfs.$$"}"
+	mkdir -p "${root_mnt}"
+	mount "${root_dev}" "${root_mnt}"
+	show " - Root mount: ${root_mnt}"
+	if [ -n "${boot_dev}" ]; then
+		show "Mounting boot partition"
+		boot_mnt="${root_mnt}/boot"
+		mount "${boot_dev}" "${boot_mnt}"
+		show " - Boot mount: ${boot_mnt}"
+	fi
+	path="${root_mnt}"
+
+	if [ -n "${wait}" ]; then
+		read -p "Waiting, press ENTER to continue"
+		exit 0
+	fi
+else
+	# Ensure boot is linked to the correct place
+	if [ -n "${extra_dir}" ] && [ "${extra_dir}" != "${path}/boot" ]; then
+		boot_mnt="${path}/boot"
+		mount --bind "${extra_dir}" "${boot_mnt}"
+	fi
+fi
+
+# Container
+show "Creating container"
+systemd-nspawn -qaD "${path}" \
+	--bind "/:${HOST_MOUNT_DIR}" \
+	--bind-ro "/dev/null:/etc/ld.so.preload" \
+	--bind-ro "$(which qemu-arm-static):/usr/bin/qemu-arm-static" \
+	--chdir="${HOST_MOUNT_DIR}${PWD}" \
+	--hostname "$(cat "${path}/etc/hostname")" \
+	"$@"
+show "Removed container"

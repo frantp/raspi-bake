@@ -1,0 +1,5 @@
+#!/bin/sh
+
+CMDLINE="/boot/cmdline.txt"
+
+sed -i 's| init=/usr/lib/raspi-config/init_resize.sh||' "${CMDLINE}"
