@@ -1,0 +1,7 @@
+#!/bin/sh
+
+CONFIG="/boot/config.txt"
+
+. "$(dirname "$0")/util/set_config_var"
+set_config_var dtoverlay=disable-bt "" "${CONFIG}"
+systemctl disable hciuart

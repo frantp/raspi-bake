@@ -2,7 +2,7 @@
 
 set_config_var() {
 	key="$1"; value="$2"; file="$3"
-	grep -qE "^#?[[:space:]]*${key}=" "${file}" &&
-		sed -i -E "s|^#?[[:space:]]*${key}=.*$|${key}=${value}|" "${file}" ||
-		echo "${key}=${value}" >> "${file}"
+	grep -qE "^#?[[:space:]]*${key}" "${file}" &&
+		sed -i -E "s|^#?[[:space:]]*${key}.*$|${key}${value}|" "${file}" ||
+		echo "${key}${value}" >> "${file}"
 }

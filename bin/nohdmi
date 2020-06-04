@@ -1,0 +1,5 @@
+#!/bin/sh
+
+RCLOCAL="/etc/rc.local"
+
+sed -i '$i /usr/bin/tvservice -o' "${RCLOCAL}"
