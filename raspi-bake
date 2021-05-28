@@ -34,7 +34,7 @@ usage() {
 	EOM
 }
 
-RASPBIAN_URL="https://downloads.raspberrypi.org/raspios_lite_armhf_latest"
+RASPBIAN_URL="https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2021-03-25/2021-03-04-raspios-buster-armhf-lite.zip"
 HOST_MOUNT_DIR="/mnt/host"
 
 # Check root
@@ -113,7 +113,7 @@ fi
 
 # Create mount point if necessary
 if [ -b "${path}" ]; then
-	for dev in "${path}p"*; do
+	for dev in $(ls "${path}"* | grep -v ^"${path}"$); do
 		label=$(blkid -po export "${dev}" \
 			| grep 'LABEL' \
 			| cut -d = -f 2)
@@ -168,7 +168,6 @@ show "Creating container"
 systemd-nspawn -qaD "${path}" \
 	--bind "/:${HOST_MOUNT_DIR}" \
 	--bind-ro "/dev/null:/etc/ld.so.preload" \
-	--bind-ro "$(which qemu-arm-static):/usr/bin/qemu-arm-static" \
 	--chdir="${HOST_MOUNT_DIR}${PWD}" \
 	--hostname "$(cat "${path}/etc/hostname")" \
 	"$@"
