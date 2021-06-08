@@ -8,12 +8,13 @@ raspi-bake requires the following dependencies installed in your system:
 
 - `systemd-container` to run the Raspberry Pi container
 - `qemu-user-static` for ARM emulation
-- `unzip` if you want to automatically download and extract the official base image
+- `parted` for partition management
+- `unzip` if downloading the official base image is required
 
 To install in Ubuntu, issue the following command:
 
 ```
-sudo apt-get install qemu-user-static systemd-container unzip
+sudo apt-get install parted qemu-user-static systemd-container unzip
 ```
 
 ## Usage
