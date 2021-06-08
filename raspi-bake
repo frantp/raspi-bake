@@ -134,9 +134,9 @@ if [ -b "${path}" ]; then
 		die "No root partition found"
 	fi
 
-	show "Ensuring maximum size for root partition"
-	parted -s "${path}" unit s resizepart ${root_num} 100%
-	resize2fs -f "${root_dev}" > /dev/null 2>&1
+	# show "Ensuring maximum size for root partition"
+	# parted -s "${path}" unit s resizepart ${root_num} 100%
+	# resize2fs -f "${root_dev}" > /dev/null 2>&1
 
 	show "Mounting root partition"
 	root_mnt="${extra_dir:-"/mnt/rootfs.$$"}"
