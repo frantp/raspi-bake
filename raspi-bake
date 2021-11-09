@@ -34,7 +34,7 @@ usage() {
 	EOM
 }
 
-RASPBIAN_URL="https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2021-03-25/2021-03-04-raspios-buster-armhf-lite.zip"
+RASPBIAN_URL="https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2021-05-28/2021-05-07-raspios-buster-armhf-lite.zip"
 HOST_MOUNT_DIR="/mnt/host"
 
 # Check root
@@ -134,9 +134,9 @@ if [ -b "${path}" ]; then
 		die "No root partition found"
 	fi
 
-	# show "Ensuring maximum size for root partition"
-	# parted -s "${path}" unit s resizepart ${root_num} 100%
-	# resize2fs -f "${root_dev}" > /dev/null 2>&1
+	show "Ensuring maximum size for root partition"
+	parted -s "${path}" unit s resizepart ${root_num} 100%
+	resize2fs -f "${root_dev}" > /dev/null 2>&1
 
 	show "Mounting root partition"
 	root_mnt="${extra_dir:-"/mnt/rootfs.$$"}"
